@@ -2,3 +2,8 @@
 BungeeCord/
 target/
 *.class
+
+# IDEA
+.idea/
+*.iml
+*.iws
