@@ -14,7 +14,10 @@ if (-not (Test-Path (Join-Path $SourceDir ".git"))) {
 Push-Location $SourceDir
     Write-Host "Reset vers l'état initial du dépôt ..." -ForegroundColor Cyan
     git checkout main
-    git branch -D deltaproxy 2>$null
+    $DeltaproxyBranchExists = git branch --list "deltaproxy"
+    if ($DeltaproxyBranchExists) {
+        git branch -D deltaproxy
+    }
     git checkout -b deltaproxy
 
     $Patches = Get-ChildItem -Path $PatchesDir -Filter "*.patch" | Sort-Object Name
