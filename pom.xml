@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>fr.deltabuild</groupId>
+    <artifactId>deltaproxy</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>DeltaProxy</name>
+    <description>
+        BungeeCord 1.6.4 modifié pour supporter les clients forge et serveurs MCPC+ (Handshake FML, custom packets 0xFA).
+    </description>
+
+    <!-- ====================================================================================================
+         * Modules
+         Les sources sont dans BungeeCord/ (généré par .\scripts\setup.ps1 et .\scripts\apply-patches.ps1).
+         ==================================================================================================== -->
+    <modules>
+        <module>BungeeCord/api</module>
+        <module>BungeeCord/bootstrap</module>
+        <module>BungeeCord/config</module>
+        <module>BungeeCord/event</module>
+        <module>BungeeCord/protocol</module>
+        <module>BungeeCord/proxy</module>
+        <module>BungeeCord/query</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.11</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>0.12.0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
