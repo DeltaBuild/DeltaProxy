@@ -4,11 +4,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>fr.deltabuild</groupId>
-    <artifactId>deltaproxy</artifactId>
+    <artifactId>deltaproxy-super</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>DeltaProxy</name>
+    <name>DeltaProxy-Super</name>
     <description>
         BungeeCord 1.6.4 modifié pour supporter les clients forge et serveurs MCPC+ (Handshake FML, custom packets 0xFA).
     </description>
@@ -18,13 +18,7 @@
          Les sources sont dans BungeeCord/ (généré par .\scripts\setup.ps1 et .\scripts\apply-patches.ps1).
          ==================================================================================================== -->
     <modules>
-        <module>BungeeCord/api</module>
-        <module>BungeeCord/bootstrap</module>
-        <module>BungeeCord/config</module>
-        <module>BungeeCord/event</module>
-        <module>BungeeCord/protocol</module>
-        <module>BungeeCord/proxy</module>
-        <module>BungeeCord/query</module>
+        <module>BungeeCord</module>
     </modules>
 
     <properties>
