@@ -1,0 +1,73 @@
+From 2f0d36b5606f690729f766d59baab215693ebd2d Mon Sep 17 00:00:00 2001
+From: Lucas AVELINO <l.avelino@skhr.fr>
+Date: Mon, 6 Apr 2026 22:17:22 +0200
+Subject: [PATCH 4/4] Replace MC authserver by NG
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
+index 77683b0..c91c839 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
+@@ -261,7 +261,7 @@ public class InitialHandler extends PacketHandler implements PendingConnection
+             }
+ 
+             String encodedHash = URLEncoder.encode( new BigInteger( sha.digest() ).toString( 16 ), "UTF-8" );
+-            String authURL = "http://session.minecraft.net/game/checkserver.jsp?user=" + encName + "&serverId=" + encodedHash;
++            String authURL = "https://authserver.nationsglory.fr/checksession?username=" + encName + "&serverId=" + encodedHash;
+ 
+             Callback<String> handler = new Callback<String>()
+             {
+@@ -275,12 +275,12 @@ public class InitialHandler extends PacketHandler implements PendingConnection
+                             finish();
+                         } else
+                         {
+-                            disconnect( "Not authenticated with Minecraft.net" );
++                            disconnect( "Not authenticated with NationsGlory" );
+                         }
+                     } else
+                     {
+                         disconnect( bungee.getTranslation( "mojang_fail" ) );
+-                        bungee.getLogger().log( Level.SEVERE, "Error authenticating " + getName() + " with minecraft.net", error );
++                        bungee.getLogger().log( Level.SEVERE, "Error authenticating " + getName() + " with NationsGlory", error );
+                     }
+                 }
+             };
+diff --git a/proxy/src/main/java/net/md_5/bungee/http/HttpClient.java b/proxy/src/main/java/net/md_5/bungee/http/HttpClient.java
+index 740e671..97e0efa 100644
+--- a/proxy/src/main/java/net/md_5/bungee/http/HttpClient.java
++++ b/proxy/src/main/java/net/md_5/bungee/http/HttpClient.java
+@@ -71,7 +71,7 @@ public class HttpClient
+             }
+         };
+ 
+-        new Bootstrap().channel( NioSocketChannel.class ).group( eventLoop ).handler( new HttpInitializer( callback, ssl ) ).
++        new Bootstrap().channel( NioSocketChannel.class ).group( eventLoop ).handler( new HttpInitializer( callback, ssl, uri.getHost(), port) ).
+                 option( ChannelOption.CONNECT_TIMEOUT_MILLIS, TIMEOUT ).remoteAddress( uri.getHost(), port ).connect().addListener( future );
+     }
+ }
+diff --git a/proxy/src/main/java/net/md_5/bungee/http/HttpInitializer.java b/proxy/src/main/java/net/md_5/bungee/http/HttpInitializer.java
+index 327bf89..a779d0e 100644
+--- a/proxy/src/main/java/net/md_5/bungee/http/HttpInitializer.java
++++ b/proxy/src/main/java/net/md_5/bungee/http/HttpInitializer.java
+@@ -18,6 +18,8 @@ public class HttpInitializer extends ChannelInitializer<Channel>
+ 
+     private final Callback<String> callback;
+     private final boolean ssl;
++    private final String host;
++    private final int port;
+ 
+     @Override
+     protected void initChannel(Channel ch) throws Exception
+@@ -31,7 +33,8 @@ public class HttpInitializer extends ChannelInitializer<Channel>
+                 TrustingX509Manager.getInstance()
+             }, null );
+ 
+-            SSLEngine engine = context.createSSLEngine();
++            SSLEngine engine = context.createSSLEngine(host, port);
++            engine.setEnabledProtocols(new String[] { "TLSv1.2" });
+             engine.setUseClientMode( true );
+ 
+             ch.pipeline().addLast( "ssl", new SslHandler( engine ) );
+-- 
+2.37.1.windows.1
+
