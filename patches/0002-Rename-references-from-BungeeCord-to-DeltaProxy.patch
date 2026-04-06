@@ -1,0 +1,109 @@
+From ea504f61b660e3d4e92adb8ec2936efcd5d6c083 Mon Sep 17 00:00:00 2001
+From: Lucas AVELINO <l.avelino@skhr.fr>
+Date: Mon, 6 Apr 2026 21:38:18 +0200
+Subject: [PATCH 2/2] Rename references from BungeeCord to DeltaProxy
+
+
+diff --git a/bootstrap/src/main/java/net/md_5/bungee/Bootstrap.java b/bootstrap/src/main/java/net/md_5/bungee/Bootstrap.java
+index 94eade5..c546fdc 100644
+--- a/bootstrap/src/main/java/net/md_5/bungee/Bootstrap.java
++++ b/bootstrap/src/main/java/net/md_5/bungee/Bootstrap.java
+@@ -41,7 +41,7 @@ public class Bootstrap
+ 
+         if ( !System.getProperty( "java.version" ).startsWith( "1.7" ) )
+         {
+-            System.err.println( "*** ERROR *** BungeeCord requires Java 7 to function!" );
++            System.err.println( "*** ERROR *** DeltaProxy requires Java 7 to function!" );
+             return;
+         }
+ 
+@@ -63,7 +63,7 @@ public class Bootstrap
+ 
+         BungeeCord bungee = new BungeeCord();
+         ProxyServer.setInstance( bungee );
+-        bungee.getLogger().info( "Enabled BungeeCord version " + bungee.getVersion() );
++        bungee.getLogger().info( "Enabled DeltaProxy version " + bungee.getVersion() );
+         bungee.start();
+ 
+         while ( bungee.isRunning )
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 5afc201..823fe5d 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -158,7 +158,7 @@ public class BungeeCord extends ProxyServer
+         if ( consoleReader.getTerminal() instanceof UnsupportedTerminal )
+         {
+             logger.info( "Unable to initialize fancy terminal. To fix this on Windows, install the correct Microsoft Visual C++ 2008 Runtime" );
+-            logger.info( "NOTE: This error is non crucial, and BungeeCord will still function correctly! Do not bug the author about it unless you are still unable to get it working" );
++            logger.info( "NOTE: This error is non crucial, and DeltaProxy will still function correctly! Do not bug the author about it unless you are still unable to get it working" );
+         }
+     }
+ 
+diff --git a/proxy/src/main/java/net/md_5/bungee/command/CommandBungee.java b/proxy/src/main/java/net/md_5/bungee/command/CommandBungee.java
+index b079879..6a44044 100644
+--- a/proxy/src/main/java/net/md_5/bungee/command/CommandBungee.java
++++ b/proxy/src/main/java/net/md_5/bungee/command/CommandBungee.java
+@@ -16,6 +16,6 @@ public class CommandBungee extends Command
+     @Override
+     public void execute(CommandSender sender, String[] args)
+     {
+-        sender.sendMessage( ChatColor.BLUE + "This server is running BungeeCord version " + ProxyServer.getInstance().getVersion() + " by md_5" );
++        sender.sendMessage( ChatColor.BLUE + "This server is running DeltaProxy version " + ProxyServer.getInstance().getVersion() + " by md_5" );
+     }
+ }
+diff --git a/proxy/src/main/java/net/md_5/bungee/command/CommandReload.java b/proxy/src/main/java/net/md_5/bungee/command/CommandReload.java
+index 437f010..f6ede23 100644
+--- a/proxy/src/main/java/net/md_5/bungee/command/CommandReload.java
++++ b/proxy/src/main/java/net/md_5/bungee/command/CommandReload.java
+@@ -19,7 +19,7 @@ public class CommandReload extends Command
+         BungeeCord.getInstance().config.load();
+         BungeeCord.getInstance().stopListeners();
+         BungeeCord.getInstance().startListeners();
+-        sender.sendMessage( ChatColor.BOLD.toString() + ChatColor.RED.toString() + "BungeeCord has been reloaded."
+-                + " This is NOT advisable and you will not be supported with any issues that arise! Please restart BungeeCord ASAP." );
++        sender.sendMessage( ChatColor.BOLD.toString() + ChatColor.RED.toString() + "DeltaProxy has been reloaded."
++                + " This is NOT advisable and you will not be supported with any issues that arise! Please restart DeltaProxy ASAP." );
+     }
+ }
+diff --git a/proxy/src/main/java/net/md_5/bungee/config/YamlConfig.java b/proxy/src/main/java/net/md_5/bungee/config/YamlConfig.java
+index 8f58a49..dd65f46 100644
+--- a/proxy/src/main/java/net/md_5/bungee/config/YamlConfig.java
++++ b/proxy/src/main/java/net/md_5/bungee/config/YamlConfig.java
+@@ -170,7 +170,7 @@ public class YamlConfig implements ConfigurationAdapter
+             Map<String, Object> val = entry.getValue();
+             String name = entry.getKey();
+             String addr = get( "address", "localhost:25565", val );
+-            String motd = ChatColor.translateAlternateColorCodes( '&', get( "motd", "&1Just another BungeeCord - Forced Host", val ) );
++            String motd = ChatColor.translateAlternateColorCodes( '&', get( "motd", "&1Just another DeltaProxy - Forced Host", val ) );
+             boolean restricted = get( "restricted", false, val );
+             InetSocketAddress address = Util.getAddr( addr );
+             ServerInfo info = ProxyServer.getInstance().constructServerInfo( name, address, motd, restricted );
+diff --git a/proxy/src/main/java/net/md_5/bungee/log/BungeeLogger.java b/proxy/src/main/java/net/md_5/bungee/log/BungeeLogger.java
+index fa8c508..adb9ecc 100644
+--- a/proxy/src/main/java/net/md_5/bungee/log/BungeeLogger.java
++++ b/proxy/src/main/java/net/md_5/bungee/log/BungeeLogger.java
+@@ -17,7 +17,7 @@ public class BungeeLogger extends Logger
+ 
+     public BungeeLogger(BungeeCord bungee)
+     {
+-        super( "BungeeCord", null );
++        super( "DeltaProxy", null );
+         this.bungee = bungee;
+         this.writer = new ColouredWriter( bungee.getConsoleReader() );
+ 
+diff --git a/proxy/src/main/java/net/md_5/bungee/log/LogDispatcher.java b/proxy/src/main/java/net/md_5/bungee/log/LogDispatcher.java
+index f1ccd4f..69e989e 100644
+--- a/proxy/src/main/java/net/md_5/bungee/log/LogDispatcher.java
++++ b/proxy/src/main/java/net/md_5/bungee/log/LogDispatcher.java
+@@ -12,7 +12,7 @@ public class LogDispatcher extends Thread
+ 
+     public LogDispatcher(BungeeLogger logger)
+     {
+-        super( "BungeeCord Logger Thread" );
++        super( "DeltaProxy Logger Thread" );
+         this.logger = logger;
+     }
+ 
+-- 
+2.37.1.windows.1
+

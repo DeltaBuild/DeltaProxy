@@ -1,7 +1,7 @@
-From 48975d1370bdbce67215e1e93ad1c0d43a5589e4 Mon Sep 17 00:00:00 2001
+From a16dcf393b4d126ecb91477675aaf46dd76ef541 Mon Sep 17 00:00:00 2001
 From: Lucas AVELINO <l.avelino@skhr.fr>
 Date: Mon, 6 Apr 2026 19:05:14 +0200
-Subject: [PATCH] POM-Changes
+Subject: [PATCH 1/2] POM-Changes
 
 
 diff --git a/api/pom.xml b/api/pom.xml
