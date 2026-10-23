@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Loyto <loyto.skhr@gmail.com>
+Date: Sat, 24 Oct 2026 00:52:44 +0200
+Subject: [PATCH] Add NGHeight
+
+
+diff --git a/protocol/src/main/java/net/md_5/bungee/protocol/Vanilla.java b/protocol/src/main/java/net/md_5/bungee/protocol/Vanilla.java
+index 8731277..b2532be 100644
+--- a/protocol/src/main/java/net/md_5/bungee/protocol/Vanilla.java
++++ b/protocol/src/main/java/net/md_5/bungee/protocol/Vanilla.java
+@@ -162,13 +162,15 @@ public class Vanilla implements Protocol
+         {
+             DOUBLE, DOUBLE, DOUBLE, DOUBLE, FLOAT, FLOAT, BOOLEAN
+         };
++        // NGHeight : Y sur un short
+         opCodes[0x0E] = new OpCode[]
+         {
+-            BYTE, INT, BYTE, INT, BYTE
++            BYTE, INT, SHORT, INT, BYTE
+         };
++        // NGHeight : Y sur un short
+         opCodes[0x0F] = new OpCode[]
+         {
+-            INT, BYTE, INT, BYTE, ITEM, BYTE, BYTE, BYTE
++            INT, SHORT, INT, BYTE, ITEM, BYTE, BYTE, BYTE
+         };
+         opCodes[0x10] = new OpCode[]
+         {
+@@ -270,17 +272,19 @@ public class Vanilla implements Protocol
+         {
+             FLOAT, SHORT, SHORT
+         };
++        // NGHeight : masques de sections sur un int
+         opCodes[0x33] = new OpCode[]
+         {
+-            INT, INT, BOOLEAN, SHORT, SHORT, INT_BYTE
++            INT, INT, BOOLEAN, INT, INT, INT_BYTE
+         };
+         opCodes[0x34] = new OpCode[]
+         {
+             INT, INT, SHORT, INT_BYTE
+         };
++        // NGHeight : Y sur un short
+         opCodes[0x35] = new OpCode[]
+         {
+-            INT, BYTE, INT, SHORT, BYTE
++            INT, SHORT, INT, SHORT, BYTE
+         };
+         opCodes[0x36] = new OpCode[]
+         {
+diff --git a/protocol/src/main/java/net/md_5/bungee/protocol/skip/BulkChunk.java b/protocol/src/main/java/net/md_5/bungee/protocol/skip/BulkChunk.java
+index 33f03e3..064d3bb 100644
+--- a/protocol/src/main/java/net/md_5/bungee/protocol/skip/BulkChunk.java
++++ b/protocol/src/main/java/net/md_5/bungee/protocol/skip/BulkChunk.java
+@@ -11,6 +11,7 @@ public class BulkChunk extends Instruction
+         short count = in.readShort();
+         int size = in.readInt();
+         in.readBoolean();
+-        in.skipBytes( size + count * 12 );
++        // NGHeight : 16 octets par chunk (masques sur un int)
++        in.skipBytes( size + count * 16 );
+     }
+ }
