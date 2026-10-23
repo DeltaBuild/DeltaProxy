@@ -1,4 +1,4 @@
-From ea504f61b660e3d4e92adb8ec2936efcd5d6c083 Mon Sep 17 00:00:00 2001
+From 0b3026a9d72fda7423f118e289cbd4fde174c698 Mon Sep 17 00:00:00 2001
 From: Loyto <loyto.skhr@gmail.com>
 Date: Mon, 6 Apr 2026 21:38:18 +0200
 Subject: [PATCH 2/4] Rename references from BungeeCord to DeltaProxy

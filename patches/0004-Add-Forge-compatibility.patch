@@ -1,0 +1,374 @@
+From 44b27c941be132a3cddac0298bb99da09a078b8e Mon Sep 17 00:00:00 2001
+From: Loyto <loyto.skhr@gmail.com>
+Date: Fri, 23 Oct 2026 02:26:08 +0200
+Subject: [PATCH 4/4] Add Forge compatibility
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/ForgeHandshake.java b/proxy/src/main/java/net/md_5/bungee/ForgeHandshake.java
+new file mode 100644
+index 0000000..5eb7133
+--- /dev/null
++++ b/proxy/src/main/java/net/md_5/bungee/ForgeHandshake.java
+@@ -0,0 +1,97 @@
++package net.md_5.bungee;
++
++import java.io.ByteArrayInputStream;
++import java.io.DataInputStream;
++import java.io.IOException;
++import java.util.HashSet;
++import java.util.Set;
++import lombok.Data;
++import net.md_5.bungee.api.ProxyServer;
++import net.md_5.bungee.protocol.packet.PacketFAPluginMessage;
++
++/**
++ * Handshake FML (Forge 1.6.4) géré par le proxy.
++ * 1re connexion : demande de mods relayée au client, réponse mise en cache.
++ * Switch : réponse du cache si demande identique, sinon kick « Mod mismatch ».
++ * Debug : -Ddeltaproxy.debugFml=true
++ */
++public final class ForgeHandshake
++{
++
++    public static final String CHANNEL = "FML";
++    // Types de paquets FML 1.6.4
++    public static final int MOD_LIST_REQUEST = 0;
++    public static final int MOD_LIST_RESPONSE = 1;
++    public static final int MOD_IDENTIFIERS = 2;
++    public static final int MOD_MISSING = 3;
++    /*========================================================================*/
++    private static final boolean DEBUG = Boolean.getBoolean( "deltaproxy.debugFml" );
++    private static final int DEBUG_MAX_BYTES = 256;
++    private static final char[] HEX = "0123456789abcdef".toCharArray();
++
++    private ForgeHandshake()
++    {
++    }
++
++    // Type FML du message, -1 si ce n'est pas du FML
++    public static int getType(PacketFAPluginMessage message)
++    {
++        if ( !CHANNEL.equals( message.getTag() ) || message.getData() == null || message.getData().length == 0 )
++        {
++            return -1;
++        }
++        return message.getData()[0] & 0xFF;
++    }
++
++    public static boolean isType(PacketFAPluginMessage message, int type)
++    {
++        return getType( message ) == type;
++    }
++
++    // Lit une demande de mods : type, nombre, ids, niveau de compat
++    public static ModListRequest parseRequest(byte[] data) throws IOException
++    {
++        DataInputStream in = new DataInputStream( new ByteArrayInputStream( data ) );
++        in.readUnsignedByte(); // type
++        int count = in.readInt();
++        Set<String> mods = new HashSet<>();
++        for ( int i = 0; i < count; i++ )
++        {
++            mods.add( in.readUTF() );
++        }
++        byte compatibilityLevel = in.readByte();
++        return new ModListRequest( mods, compatibilityLevel );
++    }
++
++    // Log hexa des messages FML si debug actif
++    public static void debug(Object who, String direction, PacketFAPluginMessage message)
++    {
++        if ( !DEBUG || !CHANNEL.equals( message.getTag() ) )
++        {
++            return;
++        }
++        byte[] data = message.getData();
++        int len = ( data == null ) ? 0 : data.length;
++        StringBuilder sb = new StringBuilder();
++        sb.append( "[FML] " ).append( who ).append( ' ' ).append( direction );
++        sb.append( " type=" ).append( getType( message ) ).append( " len=" ).append( len ).append( " data=" );
++        for ( int i = 0; i < Math.min( len, DEBUG_MAX_BYTES ); i++ )
++        {
++            sb.append( HEX[( data[i] >> 4 ) & 0xF] ).append( HEX[data[i] & 0xF] );
++        }
++        if ( len > DEBUG_MAX_BYTES )
++        {
++            sb.append( "..." );
++        }
++        ProxyServer.getInstance().getLogger().info( sb.toString() );
++    }
++
++    // Demande de mods, ordre ignoré à la comparaison
++    @Data
++    public static final class ModListRequest
++    {
++
++        private final Set<String> mods;
++        private final byte compatibilityLevel;
++    }
++}
+diff --git a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
+index a410ff5..7cbbca0 100644
+--- a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
++++ b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
+@@ -3,10 +3,10 @@ package net.md_5.bungee;
+ import com.google.common.base.Preconditions;
+ import com.google.common.io.ByteArrayDataOutput;
+ import com.google.common.io.ByteStreams;
+-import java.io.DataInput;
+ import java.security.PublicKey;
+ import java.util.Objects;
+ import java.util.Queue;
++import java.util.logging.Level;
+ import javax.crypto.Cipher;
+ import javax.crypto.SecretKey;
+ import lombok.RequiredArgsConstructor;
+@@ -51,7 +51,8 @@ public class ServerConnector extends PacketHandler
+     private final BungeeServerInfo target;
+     private State thisState = State.ENCRYPT_REQUEST;
+     private SecretKey secretkey;
+-    private boolean sentMessages;
++    // Demande relayée au client, mise en cache avec sa réponse
++    private ForgeHandshake.ModListRequest relayedModListRequest;
+ 
+     private enum State
+     {
+@@ -96,12 +97,22 @@ public class ServerConnector extends PacketHandler
+     public void disconnected(ChannelWrapper channel) throws Exception
+     {
+         user.getPendingConnects().remove( target );
++        clearPendingForgeHandshake();
++    }
++
++    private void clearPendingForgeHandshake()
++    {
++        if ( user.getPendingForgeHandshake() == this )
++        {
++            user.setPendingForgeHandshake( null );
++        }
+     }
+ 
+     @Override
+     public void handle(Packet1Login login) throws Exception
+     {
+         Preconditions.checkState( thisState == State.LOGIN, "Not exepcting LOGIN" );
++        clearPendingForgeHandshake();
+ 
+         ServerConnection server = new ServerConnection( ch, target );
+         ServerConnectedEvent event = new ServerConnectedEvent( user, server );
+@@ -121,12 +132,9 @@ public class ServerConnector extends PacketHandler
+         {
+             ch.write( message );
+         }
+-        if ( !sentMessages )
++        for ( PacketFAPluginMessage message : user.getPendingConnection().getLoginMessages() )
+         {
+-            for ( PacketFAPluginMessage message : user.getPendingConnection().getLoginMessages() )
+-            {
+-                ch.write( message );
+-            }
++            ch.write( message );
+         }
+ 
+         if ( user.getSettings() != null )
+@@ -281,30 +289,81 @@ public class ServerConnector extends PacketHandler
+             throw new IllegalStateException( "May not connect to another BungeCord!" );
+         }
+ 
+-        DataInput in = pluginMessage.getStream();
+-        if ( pluginMessage.getTag().equals( "FML" ) && in.readUnsignedByte() == 0 )
++        ForgeHandshake.debug( this, "server -> proxy", pluginMessage );
++
++        int fmlType = ForgeHandshake.getType( pluginMessage );
++        if ( fmlType == ForgeHandshake.MOD_LIST_REQUEST )
+         {
+-            int count = in.readInt();
+-            for ( int i = 0; i < count; i++ )
+-            {
+-                in.readUTF();
+-            }
+-            if ( in.readByte() != 0 )
+-            {
+-                // TODO: Using forge flag
+-                ch.getHandle().pipeline().get( PacketDecoder.class ).setProtocol( Forge.getInstance() );
+-            }
++            handleModListRequest( pluginMessage );
++            return;
++        }
++        if ( fmlType == ForgeHandshake.MOD_MISSING && user.getPendingConnection().getForgeLogin() != null && user.getServer() != null )
++        {
++            // Switch : le serveur refuse la réponse en cache
++            disconnectModMismatch( "server rejected the cached mod list" );
++            return;
+         }
+ 
+         user.unsafe().sendPacket( pluginMessage ); // We have to forward these to the user, especially with Forge as stuff might break
+-        if ( !sentMessages && user.getPendingConnection().getForgeLogin() != null )
++    }
++
++    // Demande de mods envoyée par le serveur
++    private void handleModListRequest(PacketFAPluginMessage request) throws Exception
++    {
++        ForgeHandshake.ModListRequest parsed = ForgeHandshake.parseRequest( request.getData() );
++        if ( parsed.getCompatibilityLevel() != 0 )
+         {
+-            for ( PacketFAPluginMessage message : user.getPendingConnection().getLoginMessages() )
+-            {
+-                ch.write( message );
+-            }
+-            sentMessages = true;
++            // TODO: Using forge flag
++            ch.getHandle().pipeline().get( PacketDecoder.class ).setProtocol( Forge.getInstance() );
++        }
++
++        // Client vanilla : on transmet
++        if ( user.getPendingConnection().getForgeLogin() == null )
++        {
++            user.unsafe().sendPacket( request );
++            return;
++        }
++
++        byte[] cachedResponse = user.getForgeModListResponse();
++        if ( cachedResponse == null )
++        {
++            // 1re connexion : relais au client, réponse via UpstreamBridge
++            relayedModListRequest = parsed;
++            user.setPendingForgeHandshake( this );
++            user.unsafe().sendPacket( request );
++            return;
+         }
++
++        // Switch : réponse du cache si demande identique
++        if ( parsed.equals( user.getForgeModListRequest() ) )
++        {
++            ch.write( new PacketFAPluginMessage( ForgeHandshake.CHANNEL, cachedResponse ) );
++        } else
++        {
++            disconnectModMismatch( "mod list request differs from the cached one" );
++        }
++    }
++
++    // Réponse du client : mise en cache puis envoi au serveur
++    public void forwardClientModListResponse(PacketFAPluginMessage response)
++    {
++        if ( relayedModListRequest == null )
++        {
++            return;
++        }
++        user.setForgeModListRequest( relayedModListRequest );
++        user.setForgeModListResponse( response.getData() );
++        ch.write( response );
++    }
++
++    private void disconnectModMismatch(String detail)
++    {
++        bungee.getLogger().log( Level.WARNING, "{0} Forge mod mismatch: {1}", new Object[]
++        {
++            this, detail
++        } );
++        user.disconnect( bungee.getTranslation( "forge_mod_mismatch" ) );
++        ch.close();
+     }
+ 
+     @Override
+diff --git a/proxy/src/main/java/net/md_5/bungee/UserConnection.java b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+index 9dec6c5..329ae2b 100644
+--- a/proxy/src/main/java/net/md_5/bungee/UserConnection.java
++++ b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+@@ -92,6 +92,18 @@ public final class UserConnection implements ProxiedPlayer
+     @Getter
+     private final Scoreboard serverSentScoreboard = new Scoreboard();
+     /*========================================================================*/
++    // Connexion serveur en attente de la réponse FML du client
++    @Getter
++    @Setter
++    private volatile ServerConnector pendingForgeHandshake;
++    // Cache du handshake FML de la 1re connexion
++    @Getter
++    @Setter
++    private volatile ForgeHandshake.ModListRequest forgeModListRequest;
++    @Getter
++    @Setter
++    private volatile byte[] forgeModListResponse;
++    /*========================================================================*/
+     @Getter
+     private String displayName;
+     /*========================================================================*/
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
+index 77683b0..2108cbc 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
+@@ -17,6 +17,7 @@ import lombok.Getter;
+ import lombok.RequiredArgsConstructor;
+ import net.md_5.bungee.BungeeCord;
+ import net.md_5.bungee.EncryptionUtil;
++import net.md_5.bungee.ForgeHandshake;
+ import net.md_5.bungee.PacketConstants;
+ import net.md_5.bungee.UserConnection;
+ import net.md_5.bungee.Util;
+@@ -124,6 +125,13 @@ public class InitialHandler extends PacketHandler implements PendingConnection
+             return;
+         }
+ 
++        // Réponse au FORGE_MOD_REQUEST du proxy, ignorée
++        if ( pluginMessage.getTag().equals( ForgeHandshake.CHANNEL ) )
++        {
++            ForgeHandshake.debug( this, "client -> proxy (ignored)", pluginMessage );
++            return;
++        }
++
+         // TODO: Unregister?
+         if ( pluginMessage.getTag().equals( "REGISTER" ) )
+         {
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java b/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java
+index d2e5afe..5795e27 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java
+@@ -2,6 +2,8 @@ package net.md_5.bungee.connection;
+ 
+ import net.md_5.bungee.BungeeCord;
+ import net.md_5.bungee.EntityMap;
++import net.md_5.bungee.ForgeHandshake;
++import net.md_5.bungee.ServerConnector;
+ import net.md_5.bungee.UserConnection;
+ import net.md_5.bungee.Util;
+ import net.md_5.bungee.api.ProxyServer;
+@@ -117,13 +119,21 @@ public class UpstreamBridge extends PacketHandler
+     @Override
+     public void handle(PacketFAPluginMessage pluginMessage) throws Exception
+     {
++        ForgeHandshake.debug( this, "client -> proxy", pluginMessage );
++
+         if ( pluginMessage.getTag().equals( "BungeeCord" ) )
+         {
+             throw new CancelSendSignal();
+         }
+-        // Hack around Forge race conditions
+-        if ( pluginMessage.getTag().equals( "FML" ) && pluginMessage.getStream().readUnsignedByte() == 1 )
++        // Réponse FML du client : uniquement vers la connexion en attente
++        if ( ForgeHandshake.isType( pluginMessage, ForgeHandshake.MOD_LIST_RESPONSE ) )
+         {
++            ServerConnector pending = con.getPendingForgeHandshake();
++            if ( pending != null )
++            {
++                con.setPendingForgeHandshake( null );
++                pending.forwardClientModListResponse( pluginMessage );
++            }
+             throw new CancelSendSignal();
+         }
+ 
+diff --git a/proxy/src/main/resources/messages.properties b/proxy/src/main/resources/messages.properties
+index ca7e615..67c833b 100644
+--- a/proxy/src/main/resources/messages.properties
++++ b/proxy/src/main/resources/messages.properties
+@@ -6,6 +6,7 @@ connect_kick=\u00a7cKicked whilst connecting to
+ current_server=\u00a76You are currently connected to 
+ fallback_kick=\u00a7cCould not connect to default server, please try again later: 
+ fallback_lobby=\u00a7cCould not connect to target server, you have been moved to the lobby server
++forge_mod_mismatch=\u00a7cMod mismatch
+ lost_connection=[Proxy] Lost connection to server.
+ mojang_fail=Error occurred while contacting login servers, are they down?
+ no_permission=\u00a7cYou do not have permission to execute this command!
+-- 
+2.37.1.windows.1
+
