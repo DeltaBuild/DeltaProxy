@@ -1,0 +1,293 @@
+From bc2cb8da7fecc57a48c7d0f52ee4f9e81b74858a Mon Sep 17 00:00:00 2001
+From: Loyto <loyto.skhr@gmail.com>
+Date: Fri, 23 Oct 2026 03:08:08 +0200
+Subject: [PATCH 5/5] Add Recube auth
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
+index 2108cbc..b32820f 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
+@@ -4,7 +4,6 @@ import com.google.common.base.Preconditions;
+ import io.netty.util.concurrent.ScheduledFuture;
+ import java.math.BigInteger;
+ import java.net.InetSocketAddress;
+-import java.net.URLEncoder;
+ import java.security.GeneralSecurityException;
+ import java.security.MessageDigest;
+ import java.util.ArrayList;
+@@ -32,7 +31,7 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
+ import net.md_5.bungee.api.event.LoginEvent;
+ import net.md_5.bungee.api.event.PostLoginEvent;
+ import net.md_5.bungee.api.event.ProxyPingEvent;
+-import net.md_5.bungee.http.HttpClient;
++import net.md_5.bungee.http.RecubeAuth;
+ import net.md_5.bungee.netty.HandlerBoss;
+ import net.md_5.bungee.netty.ChannelWrapper;
+ import net.md_5.bungee.netty.CipherDecoder;
+@@ -87,6 +86,9 @@ public class InitialHandler extends PacketHandler implements PendingConnection
+     private ScheduledFuture<?> pingFuture;
+     private InetSocketAddress vHost;
+     private byte version = -1;
++    // runtimeId renvoyé par Recube
++    @Getter
++    private String recubeRuntimeId;
+ 
+     private enum State
+     {
+@@ -257,8 +259,6 @@ public class InitialHandler extends PacketHandler implements PendingConnection
+ 
+         if ( this.onlineMode )
+         {
+-            String encName = URLEncoder.encode( InitialHandler.this.getName(), "UTF-8" );
+-
+             MessageDigest sha = MessageDigest.getInstance( "SHA-1" );
+             for ( byte[] bit : new byte[][]
+             {
+@@ -268,32 +268,42 @@ public class InitialHandler extends PacketHandler implements PendingConnection
+                 sha.update( bit );
+             }
+ 
+-            String encodedHash = URLEncoder.encode( new BigInteger( sha.digest() ).toString( 16 ), "UTF-8" );
+-            String authURL = "http://session.minecraft.net/game/checkserver.jsp?user=" + encName + "&serverId=" + encodedHash;
++            String serverHash = new BigInteger( sha.digest() ).toString( 16 );
++            String ip = getAddress().getAddress().getHostAddress();
+ 
+-            Callback<String> handler = new Callback<String>()
++            // Vérification has-joined auprès de Recube
++            Callback<RecubeAuth.Result> handler = new Callback<RecubeAuth.Result>()
+             {
+                 @Override
+-                public void done(String result, Throwable error)
++                public void done(RecubeAuth.Result result, Throwable error)
+                 {
+                     if ( error == null )
+                     {
+-                        if ( "YES".equals( result ) )
++                        if ( result.isAuthenticated() )
+                         {
++                            recubeRuntimeId = result.getRuntimeId();
++                            bungee.getLogger().log( Level.INFO, "{0} authenticated with Recube (runtimeId={1})", new Object[]
++                            {
++                                getName(), recubeRuntimeId
++                            } );
+                             finish();
+                         } else
+                         {
+-                            disconnect( "Not authenticated with Minecraft.net" );
++                            bungee.getLogger().log( Level.INFO, "{0} refused by Recube (HTTP {1})", new Object[]
++                            {
++                                getName(), result.getStatus()
++                            } );
++                            disconnect( bungee.getTranslation( "recube_not_authenticated" ) );
+                         }
+                     } else
+                     {
+-                        disconnect( bungee.getTranslation( "mojang_fail" ) );
+-                        bungee.getLogger().log( Level.SEVERE, "Error authenticating " + getName() + " with minecraft.net", error );
++                        disconnect( bungee.getTranslation( "recube_fail" ) );
++                        bungee.getLogger().log( Level.SEVERE, "Error authenticating " + getName() + " with Recube", error );
+                     }
+                 }
+             };
+ 
+-            HttpClient.get( authURL, ch.getHandle().eventLoop(), handler );
++            RecubeAuth.hasJoined( getName(), serverHash, ip, ch.getHandle().eventLoop(), handler );
+         } else
+         {
+             finish();
+diff --git a/proxy/src/main/java/net/md_5/bungee/http/RecubeAuth.java b/proxy/src/main/java/net/md_5/bungee/http/RecubeAuth.java
+new file mode 100644
+index 0000000..ea5c7de
+--- /dev/null
++++ b/proxy/src/main/java/net/md_5/bungee/http/RecubeAuth.java
+@@ -0,0 +1,173 @@
++package net.md_5.bungee.http;
++
++import com.google.common.util.concurrent.ThreadFactoryBuilder;
++import com.google.gson.JsonElement;
++import com.google.gson.JsonObject;
++import com.google.gson.JsonParser;
++import io.netty.channel.EventLoop;
++import java.io.ByteArrayOutputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.UnsupportedEncodingException;
++import java.net.URL;
++import java.net.URLEncoder;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.RejectedExecutionException;
++import javax.net.ssl.HttpsURLConnection;
++import javax.net.ssl.SSLContext;
++import lombok.Data;
++import net.md_5.bungee.api.Callback;
++
++/**
++ * Authentification Recube : vérification has-joined entre le client et le proxy.
++ * Appel HTTPS en TLS 1.2 avec vérification du certificat, hors boucle réseau.
++ * Le résultat est renvoyé sur la boucle réseau du joueur.
++ */
++public final class RecubeAuth
++{
++
++    // URL de base et tenant Recube
++    private static final String BASE_URL = "https://recube.gg";
++    private static final String TENANT = "nationsglory";
++    // Délais de connexion et de lecture
++    private static final int CONNECT_TIMEOUT_MS = 5000;
++    private static final int READ_TIMEOUT_MS = 8000;
++    // Taille max de la réponse lue
++    private static final int MAX_BODY_BYTES = 16384;
++    // Threads dédiés aux appels Recube
++    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool( new ThreadFactoryBuilder().setNameFormat( "Recube Auth #%1$d" ).setDaemon( true ).build() );
++
++    private RecubeAuth()
++    {
++    }
++
++    // Lance la vérification has-joined, résultat sur la boucle réseau
++    public static void hasJoined(final String username, final String serverHash, final String ip, final EventLoop eventLoop, final Callback<Result> callback)
++    {
++        EXECUTOR.execute( new Runnable()
++        {
++            @Override
++            public void run()
++            {
++                Result result = null;
++                Throwable error = null;
++                try
++                {
++                    result = request( username, serverHash, ip );
++                } catch ( Throwable t )
++                {
++                    error = t;
++                }
++
++                final Result finalResult = result;
++                final Throwable finalError = error;
++                try
++                {
++                    eventLoop.execute( new Runnable()
++                    {
++                        @Override
++                        public void run()
++                        {
++                            callback.done( finalResult, finalError );
++                        }
++                    } );
++                } catch ( RejectedExecutionException ex )
++                {
++                    // Boucle réseau arrêtée, le joueur est déjà parti
++                }
++            }
++        } );
++    }
++
++    // Appel GET has-joined
++    private static Result request(String username, String serverHash, String ip) throws Exception
++    {
++        String url = BASE_URL + "/api/game-auth/" + TENANT + "/has-joined?username=" + enc( username ) + "&serverId=" + enc( serverHash );
++        if ( ip != null && !ip.isEmpty() )
++        {
++            url += "&ip=" + enc( ip );
++        }
++
++        HttpsURLConnection conn = (HttpsURLConnection) new URL( url ).openConnection();
++        try
++        {
++            SSLContext tls = SSLContext.getInstance( "TLSv1.2" );
++            tls.init( null, null, null );
++            conn.setSSLSocketFactory( tls.getSocketFactory() );
++            conn.setConnectTimeout( CONNECT_TIMEOUT_MS );
++            conn.setReadTimeout( READ_TIMEOUT_MS );
++            conn.setUseCaches( false );
++            conn.setInstanceFollowRedirects( false );
++            conn.setRequestMethod( "GET" );
++            conn.setRequestProperty( "Accept", "application/json" );
++            conn.setRequestProperty( "User-Agent", "DeltaProxy" );
++
++            int status = conn.getResponseCode();
++            if ( status != 200 )
++            {
++                return new Result( false, status, null, null );
++            }
++
++            JsonElement json = new JsonParser().parse( readBody( conn.getInputStream() ) );
++            if ( !json.isJsonObject() )
++            {
++                return new Result( false, status, null, null );
++            }
++            JsonObject obj = json.getAsJsonObject();
++            String id = stringOf( obj, "id" );
++            if ( id == null || id.isEmpty() )
++            {
++                return new Result( false, status, null, null );
++            }
++            return new Result( true, status, id, stringOf( obj, "name" ) );
++        } finally
++        {
++            conn.disconnect();
++        }
++    }
++
++    private static String readBody(InputStream in) throws IOException
++    {
++        try
++        {
++            ByteArrayOutputStream out = new ByteArrayOutputStream();
++            byte[] buf = new byte[ 4096 ];
++            int n;
++            while ( ( n = in.read( buf ) ) != -1 )
++            {
++                out.write( buf, 0, n );
++                if ( out.size() > MAX_BODY_BYTES )
++                {
++                    throw new IOException( "Recube response too large" );
++                }
++            }
++            return new String( out.toByteArray(), "UTF-8" );
++        } finally
++        {
++            in.close();
++        }
++    }
++
++    private static String stringOf(JsonObject obj, String key)
++    {
++        JsonElement e = obj.get( key );
++        return ( e == null || !e.isJsonPrimitive() ) ? null : e.getAsString();
++    }
++
++    private static String enc(String s) throws UnsupportedEncodingException
++    {
++        return URLEncoder.encode( s, "UTF-8" );
++    }
++
++    // Résultat has-joined : authenticated=false si Recube refuse
++    @Data
++    public static final class Result
++    {
++
++        private final boolean authenticated;
++        private final int status;
++        private final String runtimeId;
++        private final String name;
++    }
++}
+diff --git a/proxy/src/main/resources/messages.properties b/proxy/src/main/resources/messages.properties
+index 67c833b..8bae5f6 100644
+--- a/proxy/src/main/resources/messages.properties
++++ b/proxy/src/main/resources/messages.properties
+@@ -15,6 +15,8 @@ no_server_permission=\u00a7cYou don't have permission to access this server
+ outdated_client=Outdated Client!
+ outdated_server=Outdated Server!
+ proxy_full=Server is full
++recube_fail=\u00a7cImpossible de contacter Recube, r\u00e9essayez plus tard
++recube_not_authenticated=\u00a7cAuthentification Recube refus\u00e9e
+ restart=[Proxy] Proxy restarting.
+ server_kick=[Kicked] 
+ server_list=\u00a76You may connect to the following servers at this time: 
+-- 
+2.37.1.windows.1
+

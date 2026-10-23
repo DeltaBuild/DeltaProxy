@@ -1,7 +1,7 @@
 From 4c8a7b10d06e21fc736f849f348a3c043c2e1bcc Mon Sep 17 00:00:00 2001
 From: Loyto <loyto.skhr@gmail.com>
 Date: Mon, 6 Apr 2026 21:48:17 +0200
-Subject: [PATCH 3/4] Delete old Metrics system
+Subject: [PATCH 3/5] Delete old Metrics system
 
 
 diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java

@@ -1,7 +1,7 @@
 From 0b3026a9d72fda7423f118e289cbd4fde174c698 Mon Sep 17 00:00:00 2001
 From: Loyto <loyto.skhr@gmail.com>
 Date: Mon, 6 Apr 2026 21:38:18 +0200
-Subject: [PATCH 2/4] Rename references from BungeeCord to DeltaProxy
+Subject: [PATCH 2/5] Rename references from BungeeCord to DeltaProxy
 
 
 diff --git a/bootstrap/src/main/java/net/md_5/bungee/Bootstrap.java b/bootstrap/src/main/java/net/md_5/bungee/Bootstrap.java
