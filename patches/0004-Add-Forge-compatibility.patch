@@ -1,7 +1,7 @@
-From 44b27c941be132a3cddac0298bb99da09a078b8e Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Loyto <loyto.skhr@gmail.com>
 Date: Fri, 23 Oct 2026 02:26:08 +0200
-Subject: [PATCH 4/5] Add Forge compatibility
+Subject: [PATCH] Add Forge compatibility
 
 
 diff --git a/proxy/src/main/java/net/md_5/bungee/ForgeHandshake.java b/proxy/src/main/java/net/md_5/bungee/ForgeHandshake.java
@@ -369,6 +369,3 @@ index ca7e615..67c833b 100644
  lost_connection=[Proxy] Lost connection to server.
  mojang_fail=Error occurred while contacting login servers, are they down?
  no_permission=\u00a7cYou do not have permission to execute this command!
--- 
-2.37.1.windows.1
-

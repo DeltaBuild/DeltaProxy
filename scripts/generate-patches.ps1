@@ -22,7 +22,7 @@ Push-Location $SourceDir
     Remove-Item "$PatchesDir\*.patch" -ErrorAction SilentlyContinue
 
     Write-Host "Génération des nouveaux correctifs ..." -ForegroundColor Cyan
-    git format-patch main --output-directory $PatchesDir --no-stat
+    git format-patch main --output-directory $PatchesDir --no-stat -N --zero-commit --no-signature
 
     if($LASTEXITCODE -ne 0) {
         Write-Host "Échec de la génération des correctifs." -ForegroundColor Red

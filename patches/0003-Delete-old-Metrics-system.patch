@@ -1,7 +1,7 @@
-From 4c8a7b10d06e21fc736f849f348a3c043c2e1bcc Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Loyto <loyto.skhr@gmail.com>
 Date: Mon, 6 Apr 2026 21:48:17 +0200
-Subject: [PATCH 3/5] Delete old Metrics system
+Subject: [PATCH] Delete old Metrics system
 
 
 diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
@@ -166,6 +166,3 @@ index 77c8828..0000000
 -        return URLEncoder.encode( text, "UTF-8" );
 -    }
 -}
--- 
-2.37.1.windows.1
-

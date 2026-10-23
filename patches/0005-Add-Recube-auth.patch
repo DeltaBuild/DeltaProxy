@@ -1,7 +1,7 @@
-From bc2cb8da7fecc57a48c7d0f52ee4f9e81b74858a Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Loyto <loyto.skhr@gmail.com>
 Date: Fri, 23 Oct 2026 03:08:08 +0200
-Subject: [PATCH 5/5] Add Recube auth
+Subject: [PATCH] Add Recube auth
 
 
 diff --git a/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java b/proxy/src/main/java/net/md_5/bungee/connection/InitialHandler.java
@@ -288,6 +288,3 @@ index 67c833b..8bae5f6 100644
  restart=[Proxy] Proxy restarting.
  server_kick=[Kicked] 
  server_list=\u00a76You may connect to the following servers at this time: 
--- 
-2.37.1.windows.1
-
