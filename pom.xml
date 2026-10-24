@@ -56,4 +56,17 @@
             </plugin>
         </plugins>
     </build>
+
+    <distributionManagement>
+        <repository>
+            <id>deltabuild-maven-DeltaBuild</id>
+            <name>Deltabuild Maven Repository</name>
+            <url>https://maven.deltabuild.fr/DeltaBuild</url>
+        </repository>
+        <snapshotRepository>
+            <id>deltabuild-maven-DeltaBuild</id>
+            <name>Deltabuild Maven Repository</name>
+            <url>https://maven.deltabuild.fr/DeltaBuild</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>
